@@ -195,7 +195,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 tvStepCount.setText(String.valueOf(stepCounter) + "걸음");
                 if (stepCounter < Size) { //100걸음 미만일때
                     TryAgain();
-                } else if (stepCounter >= Size) { //100걸음 이상일때
+                } else if (stepCounter == Size) { //100걸음 이상일때
                     hide();
                     Goal();
                 }
