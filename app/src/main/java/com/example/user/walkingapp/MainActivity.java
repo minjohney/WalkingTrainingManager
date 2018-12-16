@@ -1,6 +1,7 @@
 package com.example.user.walkingapp;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -37,30 +38,32 @@ import android.widget.ToggleButton;
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
     protected SensorManager sensorManager;
-    protected Sensor stepCountSensor;
+    protected Sensor MyStepCount;
     protected TextView tvStepCount;
     protected Button MyLocation;
     private int stepCounter;
     protected MyLocationListener myLocationListener;
+    protected LocationManager locationManager;
     protected double latitude;
     protected double longitude;
     protected double altitude;
     private int Size = 100;
     protected TextView tvLocation;
 
+
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         tvLocation = (TextView) findViewById(R.id.text2);
         MyLocation = (Button) findViewById(R.id.myLocation);
 
-        final LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        //위치 서비스를 사용하겠습니다.
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         myLocationListener = new MyLocationListener();
         long minTime = 1000;
-        float minDistance = 0;
+        float minDistance = 0; //미세한 위치 변화도 감지
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // TODO: Consider calling
             //    ActivityCompat#requestPermissions
@@ -74,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, minTime, minDistance, myLocationListener);
 
 
+        //내가 어디 걷고 있을까 라는 버튼을 눌렀을 때 함수 불러옴
         MyLocation.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -83,13 +87,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         tvStepCount = (TextView) findViewById(R.id.tvStepCount);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        stepCountSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
+        MyStepCount = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR); //걸음 측정을 위한 센서 불러옴
 
-        if (stepCountSensor == null) {
+        //센서가 없는 경우 Toast 메시지를 띄운다.
+        if (MyStepCount == null) {
             Toast.makeText(this, "No Step Detect Sensor", Toast.LENGTH_SHORT).show();
         }
     }
 
+    //나의 현재 위치를 보여주는 함수(->지도에 위치 표시)
     private void showLocation() {
         latitude = myLocationListener.latitude;
         longitude = myLocationListener.longitude;
@@ -100,10 +106,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
 
-    private void show() {
+    //최대 백걸음 미만일 때 상단에 뜨는 알림 생성
+    private void TryAgain() {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "default");
 
-        builder.setSmallIcon(R.drawable.ic_launcher_foreground);
+        builder.setSmallIcon(R.drawable.walk);
         builder.setContentTitle("서민진 트레이너입니다");
         builder.setContentText("조금만 힘내서 걸어봐요");
 
@@ -130,45 +137,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         manager.notify(1, builder.build());
     }
 
+    //100걸음 이상이 되었을 때 TryAgain() 함수를 닫는것
     public void hide() {
         NotificationManagerCompat.from(this).cancel(1);
     }
 
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        sensorManager.registerListener(this, stepCountSensor, SensorManager.SENSOR_DELAY_NORMAL);
-
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        sensorManager.unregisterListener(this);
-    }
-
-    @Override
-    public void onSensorChanged(SensorEvent sensorEvent) {
-        if (sensorEvent.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
-            if (sensorEvent.values[0] == 1.0f) {
-                stepCounter++;
-                tvStepCount.setText(String.valueOf(stepCounter) + "걸음");
-                if (stepCounter < Size) {
-                    show();
-                } else if (stepCounter >= Size) {
-                    hide();
-                    show2();
-                }
-            }
-        }
-    }
-
-
-    private void show2() {
+    //최대로 지정한 100걸음이 되었을 때 생성되는 푸시 알림
+    private void Goal() {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "default");
 
-        builder.setSmallIcon(R.drawable.ic_launcher_foreground);
+        builder.setSmallIcon(R.drawable.walk);
         builder.setContentTitle("서민진 트레이너입니다");
         builder.setContentText("백걸음 달성하셨어요 건강함의 일인자가 되셨어요!");
 
@@ -194,6 +172,38 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
         manager.notify(2, builder.build());
     }
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        sensorManager.registerListener(this, MyStepCount, SensorManager.SENSOR_DELAY_NORMAL);
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        sensorManager.unregisterListener(this);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent sensorEvent) {
+        if (sensorEvent.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
+            if (sensorEvent.values[0] == 1.0f) {
+                stepCounter++;
+                tvStepCount.setText(String.valueOf(stepCounter) + "걸음");
+                if (stepCounter < Size) { //100걸음 미만일때
+                    TryAgain();
+                } else if (stepCounter >= Size) { //100걸음 이상일때
+                    hide();
+                    Goal();
+                }
+            }
+        }
+    }
+
+
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
